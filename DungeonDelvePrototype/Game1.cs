@@ -5,6 +5,8 @@ using System;
 
 namespace DungeonDelvePrototype
 {
+	public enum SpriteAction { Waiting, Moving, Attacking }
+
 	public class MovableGameSprite
 	{
 		public string Name { get; set; }
@@ -13,12 +15,15 @@ namespace DungeonDelvePrototype
 		public Vector2 Position { get; set; }
 		public MovableGameSprite AttackTarget { get; set; }
 		public int Speed { get; set; }
+		public int StandardDamage { get; set; }
 		public Vector2 MoveToDestination { get; set; }
+		public SpriteAction CurrentAction;
 
 		public MovableGameSprite()
 		{
 			Position = new Vector2( 0, 0 );
 			MoveToDestination = new Vector2( 0, 0 );
+			CurrentAction = SpriteAction.Waiting;
 		}
 
 		public bool WasClicked( Point mousePosition )
@@ -29,15 +34,27 @@ namespace DungeonDelvePrototype
 
 		private void DoAttackIfAble()
 		{
-
+			//AttackTarget.Life -= StandardDamage;
 		}
 
 		public void Update( GameTime gameTime )
 		{
-			DoAttackIfAble();
+			switch( CurrentAction )
+			{
+				case SpriteAction.Moving:
+					MoveIfRequired( gameTime );
+					break;
 
+				case SpriteAction.Attacking:
+					DoAttackIfAble();
+					break;
+			}
+		}
+
+		private void MoveIfRequired( GameTime gameTime )
+		{
 			//Wacky Hacky
-			if( MoveToDestination.X != -100 )
+			if( CurrentAction == SpriteAction.Moving )
 			{
 				if( Position.X != MoveToDestination.X || Position.Y != MoveToDestination.Y )
 				{
@@ -46,7 +63,7 @@ namespace DungeonDelvePrototype
 				}
 
 				if( Position.X == MoveToDestination.X && Position.Y == MoveToDestination.Y )
-					MoveToDestination = new Vector2( -100, -100 );
+					CurrentAction = SpriteAction.Waiting;
 			}
 		}
 
@@ -182,9 +199,15 @@ namespace DungeonDelvePrototype
 					return;
 
 				if( _dragon.WasClicked( Mouse.GetState().Position ) )
+				{
 					_currentlySelectedSprite.AttackTarget = _dragon;
+					_currentlySelectedSprite.CurrentAction = SpriteAction.Attacking;
+				}
 				else
+				{
 					_currentlySelectedSprite.MoveToDestination = new Vector2( Mouse.GetState().Position.X - _currentlySelectedSprite.Image.Width / 2, Mouse.GetState().Position.Y - _currentlySelectedSprite.Image.Height / 2 );
+					_currentlySelectedSprite.CurrentAction = SpriteAction.Moving;
+				}
 
 				wasMouseRightClicked = false;
 			}
