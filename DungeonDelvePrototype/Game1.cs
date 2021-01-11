@@ -8,8 +8,10 @@ namespace DungeonDelvePrototype
 	public class MovableGameSprite
 	{
 		public string Name { get; set; }
+		public int Life { get; set; }
 		public Texture2D Image { get; set; }
 		public Vector2 Position { get; set; }
+		public MovableGameSprite AttackTarget { get; set; }
 		public int Speed { get; set; }
 		public Vector2 MoveToDestination { get; set; }
 
@@ -25,8 +27,15 @@ namespace DungeonDelvePrototype
 					( mousePosition.Y > Position.Y && mousePosition.Y < Position.Y + Image.Height );
 		}
 
+		private void DoAttackIfAble()
+		{
+
+		}
+
 		public void Update( GameTime gameTime )
 		{
+			DoAttackIfAble();
+
 			//Wacky Hacky
 			if( MoveToDestination.X != -100 )
 			{
@@ -64,8 +73,7 @@ namespace DungeonDelvePrototype
 		private MovableGameSprite _mage;
 		private MovableGameSprite _currentlySelectedSprite;
 
-		private Texture2D _dragon;
-		private Vector2 _dragonPosition;
+		private MovableGameSprite _dragon;
 
 		private bool wasMouseLeftClicked = false;
 		private bool wasMouseRightClicked = false;
@@ -82,27 +90,33 @@ namespace DungeonDelvePrototype
 
 		protected override void Initialize()
 		{
-			_currentlySelectedSprite = new MovableGameSprite();
+			_currentlySelectedSprite = null;
 
 			_warrior = new MovableGameSprite();
 			_warrior.Name = "Warrior";
-			_warrior.Position = new Vector2( 400, 200 );
+			_warrior.Life = 100;
+			_warrior.Position = new Vector2( 350, 310 );
 			_warrior.MoveToDestination = new Vector2( -100, -100 );
 			_warrior.Speed = 30;
 
 			_archer = new MovableGameSprite();
 			_archer.Name = "Archer";
-			_archer.Position = new Vector2( 450, 250 );
+			_archer.Life = 100;
+			_archer.Position = new Vector2( 450, 365 );
 			_archer.MoveToDestination = new Vector2( -100, -100 );
 			_archer.Speed = 40;
 
 			_mage = new MovableGameSprite();
 			_mage.Name = "Mage";
-			_mage.Position = new Vector2( 350, 250 );
+			_mage.Life = 100;
+			_mage.Position = new Vector2( 300, 375 );
 			_mage.MoveToDestination = new Vector2( -100, -100 );
 			_mage.Speed = 35;
 
-			_dragonPosition = new Vector2( 350, 25 );
+			_dragon = new MovableGameSprite();
+			_dragon.Name = "Dragon";
+			_dragon.Life = 100;
+			_dragon.Position = new Vector2( 325, 175 );
 
 			base.Initialize();
 		}
@@ -114,12 +128,11 @@ namespace DungeonDelvePrototype
 			_statusBar = Content.Load<Texture2D>( "StatusBar" );
 			_actionBarBack = Content.Load<Texture2D>( "ActionBarBack" );
 			_buttonTaunt = Content.Load<Texture2D>( "Button_Taunt" );
+
 			_warrior.Image = Content.Load<Texture2D>( "Warrior" );
 			_archer.Image = Content.Load<Texture2D>( "Archer" );
 			_mage.Image = Content.Load<Texture2D>( "Mage" );
-			_dragon = Content.Load<Texture2D>( "Dragon" );
-
-			// TODO: use this.Content to load your game content here
+			_dragon.Image = Content.Load<Texture2D>( "Dragon" );
 		}
 
 		protected override void Update( GameTime gameTime )
@@ -165,7 +178,14 @@ namespace DungeonDelvePrototype
 
 			if( wasMouseRightClicked && Mouse.GetState().RightButton == ButtonState.Released )
 			{
-				_currentlySelectedSprite.MoveToDestination = new Vector2( Mouse.GetState().Position.X, Mouse.GetState().Position.Y );
+				if( _currentlySelectedSprite == null )
+					return;
+
+				if( _dragon.WasClicked( Mouse.GetState().Position ) )
+					_currentlySelectedSprite.AttackTarget = _dragon;
+				else
+					_currentlySelectedSprite.MoveToDestination = new Vector2( Mouse.GetState().Position.X - _currentlySelectedSprite.Image.Width / 2, Mouse.GetState().Position.Y - _currentlySelectedSprite.Image.Height / 2 );
+
 				wasMouseRightClicked = false;
 			}
 		}
@@ -179,11 +199,13 @@ namespace DungeonDelvePrototype
 
 		private void ExecuteDragonLogic( GameTime gameTime )
 		{
+
 			/*
 			 Abilities : 
 			 FireLine - Shoots a line of fire straight forward.
 			 Lose Aggro - Start attacking another member.
-			 Fire Spread - Flys up and then shoots fire in multiple directions.
+			 Fire Spread - Flys up and then shoots out fire bolts that then flare up from the outside in.
+			 GroundSlam - Pounds down on the grand after ending flight.
 			 */
 		}
 
@@ -193,13 +215,13 @@ namespace DungeonDelvePrototype
 
 			// TODO: Add your drawing code here
 			_spriteBatch.Begin();
-			_spriteBatch.Draw( _dragon, _dragonPosition, Color.White );
+			_dragon.Draw( _spriteBatch );
 			_warrior.Draw( _spriteBatch );
 			_archer.Draw( _spriteBatch );
 			_mage.Draw( _spriteBatch );
 			_spriteBatch.Draw( _statusBar, new Vector2( 0, 500 ), Color.White );
 			_spriteBatch.Draw( _actionBarBack, new Vector2( 300, 520 ), Color.White );
-			_spriteBatch.DrawString( _basicFont, _currentlySelectedSprite.Name ?? "", new Vector2( 10, 505 ), Color.Black );
+			_spriteBatch.DrawString( _basicFont, _currentlySelectedSprite?.Name ?? "", new Vector2( 10, 505 ), Color.Black );
 
 			if( _currentlySelectedSprite == _warrior )
 				_spriteBatch.Draw( _buttonTaunt, new Vector2( 303, 523 ), Color.White );
