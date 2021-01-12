@@ -10,20 +10,29 @@ namespace DungeonDelvePrototype
 	public class MovableGameSprite
 	{
 		public string Name { get; set; }
-		public int Life { get; set; }
+		public double Life { get; set; }
+		public double MaxLife { get; set; }
 		public Texture2D Image { get; set; }
 		public Vector2 Position { get; set; }
 		public MovableGameSprite AttackTarget { get; set; }
 		public int Speed { get; set; }
 		public int StandardDamage { get; set; }
+		public double AttackDelay { get; set; }
+		public int AttackRange { get; set; }
 		public Vector2 MoveToDestination { get; set; }
 		public SpriteAction CurrentAction;
+		public Color SpriteColor { get; set; }
+
+		private double LastAttackTime = 0;
 
 		public MovableGameSprite()
 		{
 			Position = new Vector2( 0, 0 );
 			MoveToDestination = new Vector2( 0, 0 );
 			CurrentAction = SpriteAction.Waiting;
+			SpriteColor = Color.White;
+
+			//TODO : Note, this should default alot more properties to prevent failure edge cases where something was not set.
 		}
 
 		public bool WasClicked( Point mousePosition )
@@ -32,9 +41,38 @@ namespace DungeonDelvePrototype
 					( mousePosition.Y > Position.Y && mousePosition.Y < Position.Y + Image.Height );
 		}
 
-		private void DoAttackIfAble()
+		private void DoAttackIfAble( GameTime gameTime )
 		{
-			//AttackTarget.Life -= StandardDamage;
+			var targetDistance = GetDistanceToAttackTarget();
+			if( targetDistance > this.AttackRange )
+			{
+				//TODO : This is working off center points right now, and should work off size instead.
+				var attackTargetCenterPositionX = ( AttackTarget.Position.X + ( AttackTarget.Image.Width / 2 ) - ( Image.Width / 2 ) );
+				var attackTargetCenterPositionY = ( AttackTarget.Position.Y + ( AttackTarget.Image.Height / 2 ) - ( Image.Height / 2 ) );
+
+				MoveToDestination = new Vector2( attackTargetCenterPositionX, attackTargetCenterPositionY );
+				MoveIfRequired( gameTime );
+				return;
+			}
+
+			SpriteColor = Color.White;
+			if( gameTime.TotalGameTime.TotalSeconds - LastAttackTime > AttackDelay )
+			{
+				LastAttackTime = gameTime.TotalGameTime.TotalSeconds;
+				AttackTarget.Life -= StandardDamage;
+				SpriteColor = Color.Green;
+			}
+		}
+
+		private double GetDistanceToAttackTarget()
+		{
+			//TODO : Have position default to center sprite.
+			var attackTargetCenterPositionX = AttackTarget.Position.X + ( AttackTarget.Image.Width / 2 );
+			var attackTargetCenterPositionY = AttackTarget.Position.Y + ( AttackTarget.Image.Height / 2 );
+
+			var playerCenterPositionX = Position.X + ( Image.Width / 2 );
+			var playerCenterPositionY = Position.Y + ( Image.Height / 2 );
+			return Math.Sqrt( ( ( playerCenterPositionX - attackTargetCenterPositionX ) * 2 ) + ( ( playerCenterPositionY - attackTargetCenterPositionY ) * 2 ) );
 		}
 
 		public void Update( GameTime gameTime )
@@ -46,7 +84,7 @@ namespace DungeonDelvePrototype
 					break;
 
 				case SpriteAction.Attacking:
-					DoAttackIfAble();
+					DoAttackIfAble( gameTime );
 					break;
 			}
 		}
@@ -65,7 +103,7 @@ namespace DungeonDelvePrototype
 
 		public void Draw( SpriteBatch spriteBatch )
 		{
-			spriteBatch.Draw( Image, Position, Color.White );
+			spriteBatch.Draw( Image, Position, SpriteColor );
 		}
 	}
 
@@ -84,6 +122,9 @@ namespace DungeonDelvePrototype
 
 		private Rectangle _bossHealthDimensions;
 		private Texture2D _bossHealth;
+
+		private Rectangle _fullBlackScreenDimensions;
+		private Texture2D _fullBackScreen;
 
 		private Texture2D _buttonTaunt;
 
@@ -132,6 +173,13 @@ namespace DungeonDelvePrototype
 			_bossHealth = new Texture2D( GraphicsDevice, _bossHealthDimensions.Width, _bossHealthDimensions.Height );
 			_bossHealth.SetData( _bossHealthDimensions_Data );
 
+			_fullBlackScreenDimensions = new Rectangle( 0, 0, 800, 600 );
+			var _fullBlackScreenDimensions_Data = new Color[_fullBlackScreenDimensions.Width * _fullBlackScreenDimensions.Height];
+			for( int i = 0; i < _fullBlackScreenDimensions_Data.Length; ++i )
+				_fullBlackScreenDimensions_Data[i] = Color.Black;
+
+			_fullBackScreen = new Texture2D( GraphicsDevice, _fullBlackScreenDimensions.Width, _fullBlackScreenDimensions.Height );
+			_fullBackScreen.SetData( _fullBlackScreenDimensions_Data );
 
 			_warrior = new MovableGameSprite();
 			_warrior.Name = "Warrior";
@@ -139,6 +187,9 @@ namespace DungeonDelvePrototype
 			_warrior.Position = new Vector2( 350, 310 );
 			_warrior.MoveToDestination = new Vector2( -100, -100 );
 			_warrior.Speed = 30;
+			_warrior.StandardDamage = 1;
+			_warrior.AttackDelay = 0.50;
+			_warrior.AttackRange = 10;
 
 			_archer = new MovableGameSprite();
 			_archer.Name = "Archer";
@@ -146,6 +197,9 @@ namespace DungeonDelvePrototype
 			_archer.Position = new Vector2( 450, 365 );
 			_archer.MoveToDestination = new Vector2( -100, -100 );
 			_archer.Speed = 40;
+			_archer.StandardDamage = 3;
+			_archer.AttackDelay = 0.50;
+			_archer.AttackRange = 20;
 
 			_mage = new MovableGameSprite();
 			_mage.Name = "Mage";
@@ -153,10 +207,14 @@ namespace DungeonDelvePrototype
 			_mage.Position = new Vector2( 300, 375 );
 			_mage.MoveToDestination = new Vector2( -100, -100 );
 			_mage.Speed = 35;
+			_mage.StandardDamage = 3;
+			_mage.AttackDelay = 0.50;
+			_mage.AttackRange = 20;
 
 			_dragon = new MovableGameSprite();
 			_dragon.Name = "Dragon";
-			_dragon.Life = 500;
+			_dragon.Life = 1;
+			_dragon.MaxLife = 1;
 			_dragon.Position = new Vector2( 325, 175 );
 
 			base.Initialize();
@@ -205,8 +263,6 @@ namespace DungeonDelvePrototype
 
 				else if( _mage.WasClicked( mousePosition ) )
 					_currentlySelectedSprite = _mage;
-				else if( _dragon.WasClicked( mousePosition ) )
-					_dragon.Life -= 5;
 				else
 					_currentlySelectedSprite = null;
 
@@ -271,12 +327,19 @@ namespace DungeonDelvePrototype
 			_spriteBatch.Draw( _statusBar, new Vector2( 0, 500 ), Color.White );
 			_spriteBatch.Draw( _actionBarBack, new Vector2( 300, 520 ), Color.White );
 			_spriteBatch.Draw( _bossHealthBack, new Vector2( _bossHealthBackDimensions.Left, _bossHealthBackDimensions.Top ), Color.White );
-			var healthBarValue = ( int )( ( ( _dragon.Life )/500m ) * 200 );
+			var healthBarValue = ( int )( ( ( _dragon.Life )/( _dragon.MaxLife ) ) * 200 );
 			_spriteBatch.Draw( _bossHealth, new Rectangle( _bossHealthDimensions.Left, _bossHealthDimensions.Top, healthBarValue, 25 ), Color.White );
 			_spriteBatch.DrawString( _basicFont, _currentlySelectedSprite?.Name ?? "", new Vector2( 10, 505 ), Color.Black );
 
 			if( _currentlySelectedSprite == _warrior )
 				_spriteBatch.Draw( _buttonTaunt, new Vector2( 303, 523 ), Color.White );
+
+
+			if( _dragon.Life <= 0 )
+			{
+				_spriteBatch.Draw( _fullBackScreen, new Vector2( 0, 0 ), Color.White );
+				_spriteBatch.DrawString( _basicFont, "You Win!!!", new Vector2( 330, 290 ), Color.White );
+			}
 
 			_spriteBatch.End();
 
