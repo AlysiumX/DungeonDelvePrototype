@@ -53,18 +53,14 @@ namespace DungeonDelvePrototype
 
 		private void MoveIfRequired( GameTime gameTime )
 		{
-			//Wacky Hacky
-			if( CurrentAction == SpriteAction.Moving )
+			if( Position.X != MoveToDestination.X || Position.Y != MoveToDestination.Y )
 			{
-				if( Position.X != MoveToDestination.X || Position.Y != MoveToDestination.Y )
-				{
-					var direction = Vector2.Normalize( MoveToDestination -Position );
-					Position += direction * ( float )gameTime.ElapsedGameTime.TotalSeconds * Speed;
-				}
-
-				if( Position.X == MoveToDestination.X && Position.Y == MoveToDestination.Y )
-					CurrentAction = SpriteAction.Waiting;
+				var direction = Vector2.Normalize( MoveToDestination -Position );
+				Position += direction * ( float )gameTime.ElapsedGameTime.TotalSeconds * Speed;
 			}
+
+			if( Position.X == MoveToDestination.X && Position.Y == MoveToDestination.Y )
+				CurrentAction = SpriteAction.Waiting;
 		}
 
 		public void Draw( SpriteBatch spriteBatch )
@@ -83,6 +79,12 @@ namespace DungeonDelvePrototype
 		private Texture2D _statusBar;
 		private Texture2D _actionBarBack;
 
+		private Rectangle _bossHealthBackDimensions;
+		private Texture2D _bossHealthBack;
+
+		private Rectangle _bossHealthDimensions;
+		private Texture2D _bossHealth;
+
 		private Texture2D _buttonTaunt;
 
 		private MovableGameSprite _warrior;
@@ -95,6 +97,11 @@ namespace DungeonDelvePrototype
 		private bool wasMouseLeftClicked = false;
 		private bool wasMouseRightClicked = false;
 
+		//TODO : Add character select to bottom screen.
+		//TODO : MultiSelect
+		//TODO : Healthbars
+		//TODO : Healer
+		//TODO : Implement Dragon Abilities.
 		public Game1()
 		{
 			_graphics = new GraphicsDeviceManager( this );
@@ -108,6 +115,23 @@ namespace DungeonDelvePrototype
 		protected override void Initialize()
 		{
 			_currentlySelectedSprite = null;
+
+			_bossHealthBackDimensions = new Rectangle( 280, 25, 200, 25 );
+			var _bossHealthBackDimensions_Data = new Color[_bossHealthBackDimensions.Width * _bossHealthBackDimensions.Height];
+			for( int i = 0; i < _bossHealthBackDimensions_Data.Length; ++i )
+				_bossHealthBackDimensions_Data[i] = Color.Black;
+
+			_bossHealthBack = new Texture2D( GraphicsDevice, _bossHealthBackDimensions.Width, _bossHealthBackDimensions.Height );
+			_bossHealthBack.SetData( _bossHealthBackDimensions_Data );
+
+			_bossHealthDimensions = new Rectangle( 280, 25, 1, 25 );
+			var _bossHealthDimensions_Data = new Color[_bossHealthDimensions.Width * _bossHealthDimensions.Height];
+			for( int i = 0; i < _bossHealthDimensions_Data.Length; ++i )
+				_bossHealthDimensions_Data[i] = Color.Green;
+
+			_bossHealth = new Texture2D( GraphicsDevice, _bossHealthDimensions.Width, _bossHealthDimensions.Height );
+			_bossHealth.SetData( _bossHealthDimensions_Data );
+
 
 			_warrior = new MovableGameSprite();
 			_warrior.Name = "Warrior";
@@ -132,7 +156,7 @@ namespace DungeonDelvePrototype
 
 			_dragon = new MovableGameSprite();
 			_dragon.Name = "Dragon";
-			_dragon.Life = 100;
+			_dragon.Life = 500;
 			_dragon.Position = new Vector2( 325, 175 );
 
 			base.Initialize();
@@ -181,6 +205,8 @@ namespace DungeonDelvePrototype
 
 				else if( _mage.WasClicked( mousePosition ) )
 					_currentlySelectedSprite = _mage;
+				else if( _dragon.WasClicked( mousePosition ) )
+					_dragon.Life -= 5;
 				else
 					_currentlySelectedSprite = null;
 
@@ -244,6 +270,9 @@ namespace DungeonDelvePrototype
 			_mage.Draw( _spriteBatch );
 			_spriteBatch.Draw( _statusBar, new Vector2( 0, 500 ), Color.White );
 			_spriteBatch.Draw( _actionBarBack, new Vector2( 300, 520 ), Color.White );
+			_spriteBatch.Draw( _bossHealthBack, new Vector2( _bossHealthBackDimensions.Left, _bossHealthBackDimensions.Top ), Color.White );
+			var healthBarValue = ( int )( ( ( _dragon.Life )/500m ) * 200 );
+			_spriteBatch.Draw( _bossHealth, new Rectangle( _bossHealthDimensions.Left, _bossHealthDimensions.Top, healthBarValue, 25 ), Color.White );
 			_spriteBatch.DrawString( _basicFont, _currentlySelectedSprite?.Name ?? "", new Vector2( 10, 505 ), Color.Black );
 
 			if( _currentlySelectedSprite == _warrior )
