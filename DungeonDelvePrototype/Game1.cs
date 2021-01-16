@@ -3,6 +3,7 @@ using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace DungeonDelvePrototype
 {
@@ -12,8 +13,6 @@ namespace DungeonDelvePrototype
 	{
 		public Texture2D Image { get; set; }
 		public Vector2 Position { get; set; }
-		public double SpawnTime { get; set; }
-		public int FadeTime { get; set; }
 		public bool IsVisible { get; set; }
 	}
 
@@ -143,6 +142,10 @@ namespace DungeonDelvePrototype
 		private Vector2 _flameBallsDirection;
 		private double _flameDropDelay = 0.08;
 		private double _flameLastDrop = 0;
+		private bool _fireLineHasStarted = false;
+		private bool _fireLineHasEnded = false;
+		private double _flameFinishedTime = 0;
+		private double _flameStopDelay = 2.3;
 
 		private Texture2D _buttonTaunt;
 
@@ -329,6 +332,27 @@ namespace DungeonDelvePrototype
 
 		private void ExecuteDragonLogic( GameTime gameTime )
 		{
+			if( !_fireLineHasStarted )
+			{
+				var random = new Random();
+				var randomValue = random.Next( 0, 3 );
+
+				switch( randomValue )
+				{
+					case 0:
+						_dragon.AttackTarget = _warrior;
+						break;
+					case 1:
+						_dragon.AttackTarget = _archer;
+						break;
+					case 2:
+						_dragon.AttackTarget = _mage;
+						break;
+				}
+
+			}
+
+
 			CastFireLine( gameTime );
 
 			/*
@@ -342,7 +366,7 @@ namespace DungeonDelvePrototype
 
 		private void CastFireLine( GameTime gameTime )
 		{
-			_dragon.AttackTarget = _archer;
+			_fireLineHasStarted = true;
 
 			if( _flamePosition.X == 0 && _flamePosition.Y == 0 )
 				_flamePosition = new Vector2( _dragon.CenterPosition.X, _dragon.CenterPosition.Y );
@@ -351,18 +375,37 @@ namespace DungeonDelvePrototype
 			if( _flameBallsDirection.X == 0 && _flameBallsDirection.Y == 0 )
 				_flameBallsDirection = Vector2.Normalize( _dragon.AttackTarget.CenterPosition - _flamePosition );
 
-			if( _flamePosition.Y < Game_Height && gameTime.TotalGameTime.TotalSeconds - _flameLastDrop > _flameDropDelay ) //GameHeight
+			if( gameTime.TotalGameTime.TotalSeconds - _flameLastDrop > _flameDropDelay )
 			{
 				_flameLastDrop = gameTime.TotalGameTime.TotalSeconds;
 				_flamePosition += _flameBallsDirection * 16;
-				_flameBalls.Add( new Projectile() { Image = _flameBall, Position = new Vector2( _flamePosition.X, _flamePosition.Y ), SpawnTime = gameTime.TotalGameTime.TotalSeconds, FadeTime = 2, IsVisible = true } ); ;
+				_flameBalls.Add( new Projectile() { Image = _flameBall, Position = new Vector2( _flamePosition.X, _flamePosition.Y ), IsVisible = true } ); ;
 			}
 
-			foreach( var flameBall in _flameBalls )
+			if( IsPositionIsOutOfBounds( _flamePosition ) && !_fireLineHasEnded )
 			{
-				if( flameBall.SpawnTime + flameBall.FadeTime < gameTime.TotalGameTime.TotalSeconds )
-					flameBall.IsVisible = false;
+				_flameFinishedTime = gameTime.TotalGameTime.TotalSeconds;
+				_fireLineHasEnded = true;
 			}
+
+			if( _fireLineHasEnded && _flameFinishedTime + _flameStopDelay < gameTime.TotalGameTime.TotalSeconds )
+			{
+				foreach( var flameBall in _flameBalls )
+				{
+					flameBall.IsVisible = false;
+				}
+
+				_fireLineHasStarted = false;
+				_fireLineHasEnded = false;
+				_flameBallsDirection = new Vector2( 0, 0 );
+				_flamePosition = new Vector2( 0, 0 );
+				_flameBalls.Clear();
+			}
+		}
+
+		private bool IsPositionIsOutOfBounds( Vector2 position )
+		{
+			return position.X < 0 || position.Y < 0 || position.X > Game_Width || position.Y > Game_Height;
 		}
 
 		protected override void Draw( GameTime gameTime )
