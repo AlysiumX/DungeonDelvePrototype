@@ -2,10 +2,20 @@
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using System;
+using System.Collections.Generic;
 
 namespace DungeonDelvePrototype
 {
 	public enum SpriteAction { Waiting, Moving, Attacking }
+
+	public class Projectile
+	{
+		public Texture2D Image { get; set; }
+		public Vector2 Position { get; set; }
+		public double SpawnTime { get; set; }
+		public int FadeTime { get; set; }
+		public bool IsVisible { get; set; }
+	}
 
 	public class MovableGameSprite
 	{
@@ -14,6 +24,7 @@ namespace DungeonDelvePrototype
 		public double MaxLife { get; set; }
 		public Texture2D Image { get; set; }
 		public Vector2 Position { get; set; }
+		public Vector2 CenterPosition { get { return new Vector2( Position.X + Image.Width / 2, Position.Y + Image.Height / 2 ); } }
 		public MovableGameSprite AttackTarget { get; set; }
 		public int Speed { get; set; }
 		public int StandardDamage { get; set; }
@@ -66,13 +77,7 @@ namespace DungeonDelvePrototype
 
 		private double GetDistanceToAttackTarget()
 		{
-			//TODO : Have position default to center sprite.
-			var attackTargetCenterPositionX = AttackTarget.Position.X + ( AttackTarget.Image.Width / 2 );
-			var attackTargetCenterPositionY = AttackTarget.Position.Y + ( AttackTarget.Image.Height / 2 );
-
-			var playerCenterPositionX = Position.X + ( Image.Width / 2 );
-			var playerCenterPositionY = Position.Y + ( Image.Height / 2 );
-			return Math.Sqrt( ( ( playerCenterPositionX - attackTargetCenterPositionX ) * 2 ) + ( ( playerCenterPositionY - attackTargetCenterPositionY ) * 2 ) );
+			return Math.Sqrt( ( ( CenterPosition.X - AttackTarget.CenterPosition.X ) * 2 ) + ( ( CenterPosition.Y - AttackTarget.CenterPosition.Y ) * 2 ) );
 		}
 
 		public void Update( GameTime gameTime )
@@ -93,7 +98,7 @@ namespace DungeonDelvePrototype
 		{
 			if( Position.X != MoveToDestination.X || Position.Y != MoveToDestination.Y )
 			{
-				var direction = Vector2.Normalize( MoveToDestination -Position );
+				var direction = Vector2.Normalize( MoveToDestination - Position );
 				Position += direction * ( float )gameTime.ElapsedGameTime.TotalSeconds * Speed;
 			}
 
@@ -107,15 +112,16 @@ namespace DungeonDelvePrototype
 		}
 	}
 
+	[System.Runtime.InteropServices.Guid( "FCB0D89E-0E4E-4221-AD37-3377A968DD6D" )]
 	public class Game1 : Game
 	{
+		private int Game_Width = 1280;
+		private int Game_Height = 720;
+
 		private GraphicsDeviceManager _graphics;
 		private SpriteBatch _spriteBatch;
 
 		private SpriteFont _basicFont;
-
-		private Texture2D _statusBar;
-		private Texture2D _actionBarBack;
 
 		private Rectangle _bossHealthBackDimensions;
 		private Texture2D _bossHealthBack;
@@ -125,6 +131,18 @@ namespace DungeonDelvePrototype
 
 		private Rectangle _fullBlackScreenDimensions;
 		private Texture2D _fullBackScreen;
+
+		//Selections
+		private Texture2D _warriorSelection;
+		private Texture2D _archerSelection;
+		private Texture2D _mageSelection;
+
+		private Texture2D _flameBall;
+		private List<Projectile> _flameBalls;
+		private Vector2 _flamePosition;
+		private Vector2 _flameBallsDirection;
+		private double _flameDropDelay = 0.08;
+		private double _flameLastDrop = 0;
 
 		private Texture2D _buttonTaunt;
 
@@ -149,15 +167,15 @@ namespace DungeonDelvePrototype
 			Content.RootDirectory = "Content";
 			IsMouseVisible = true;
 
-			_graphics.PreferredBackBufferHeight = 600;
-			_graphics.PreferredBackBufferWidth = 800;
+			_graphics.PreferredBackBufferWidth = Game_Width;
+			_graphics.PreferredBackBufferHeight = Game_Height;
 		}
 
 		protected override void Initialize()
 		{
 			_currentlySelectedSprite = null;
 
-			_bossHealthBackDimensions = new Rectangle( 280, 25, 200, 25 );
+			_bossHealthBackDimensions = new Rectangle( ( Game_Width / 2 ) - 100, 25, 200, 25 );
 			var _bossHealthBackDimensions_Data = new Color[_bossHealthBackDimensions.Width * _bossHealthBackDimensions.Height];
 			for( int i = 0; i < _bossHealthBackDimensions_Data.Length; ++i )
 				_bossHealthBackDimensions_Data[i] = Color.Black;
@@ -165,7 +183,7 @@ namespace DungeonDelvePrototype
 			_bossHealthBack = new Texture2D( GraphicsDevice, _bossHealthBackDimensions.Width, _bossHealthBackDimensions.Height );
 			_bossHealthBack.SetData( _bossHealthBackDimensions_Data );
 
-			_bossHealthDimensions = new Rectangle( 280, 25, 1, 25 );
+			_bossHealthDimensions = new Rectangle( ( Game_Width / 2 ) - 100, 25, 1, 25 );
 			var _bossHealthDimensions_Data = new Color[_bossHealthDimensions.Width * _bossHealthDimensions.Height];
 			for( int i = 0; i < _bossHealthDimensions_Data.Length; ++i )
 				_bossHealthDimensions_Data[i] = Color.Green;
@@ -184,7 +202,7 @@ namespace DungeonDelvePrototype
 			_warrior = new MovableGameSprite();
 			_warrior.Name = "Warrior";
 			_warrior.Life = 100;
-			_warrior.Position = new Vector2( 350, 310 );
+			_warrior.Position = new Vector2( 630, 385 );
 			_warrior.MoveToDestination = new Vector2( -100, -100 );
 			_warrior.Speed = 30;
 			_warrior.StandardDamage = 1;
@@ -194,7 +212,7 @@ namespace DungeonDelvePrototype
 			_archer = new MovableGameSprite();
 			_archer.Name = "Archer";
 			_archer.Life = 100;
-			_archer.Position = new Vector2( 450, 365 );
+			_archer.Position = new Vector2( 700, 440 );
 			_archer.MoveToDestination = new Vector2( -100, -100 );
 			_archer.Speed = 40;
 			_archer.StandardDamage = 3;
@@ -204,7 +222,7 @@ namespace DungeonDelvePrototype
 			_mage = new MovableGameSprite();
 			_mage.Name = "Mage";
 			_mage.Life = 100;
-			_mage.Position = new Vector2( 300, 375 );
+			_mage.Position = new Vector2( 550, 450 );
 			_mage.MoveToDestination = new Vector2( -100, -100 );
 			_mage.Speed = 35;
 			_mage.StandardDamage = 3;
@@ -213,9 +231,13 @@ namespace DungeonDelvePrototype
 
 			_dragon = new MovableGameSprite();
 			_dragon.Name = "Dragon";
-			_dragon.Life = 1;
-			_dragon.MaxLife = 1;
-			_dragon.Position = new Vector2( 325, 175 );
+			_dragon.Life = 1000;
+			_dragon.MaxLife = 1000;
+			_dragon.Position = new Vector2( 580, 250 );
+
+			_flameBalls = new List<Projectile>();
+			_flamePosition = new Vector2( 0, 0 );
+			_flameBallsDirection = new Vector2( 0, 0 );
 
 			base.Initialize();
 		}
@@ -224,14 +246,17 @@ namespace DungeonDelvePrototype
 		{
 			_spriteBatch = new SpriteBatch( GraphicsDevice );
 			_basicFont = Content.Load<SpriteFont>( "BasicFont" );
-			_statusBar = Content.Load<Texture2D>( "StatusBar" );
-			_actionBarBack = Content.Load<Texture2D>( "ActionBarBack" );
 			_buttonTaunt = Content.Load<Texture2D>( "Button_Taunt" );
 
 			_warrior.Image = Content.Load<Texture2D>( "Warrior" );
 			_archer.Image = Content.Load<Texture2D>( "Archer" );
 			_mage.Image = Content.Load<Texture2D>( "Mage" );
 			_dragon.Image = Content.Load<Texture2D>( "Dragon" );
+			_flameBall = Content.Load<Texture2D>( "FlameBall" );
+
+			_warriorSelection = Content.Load<Texture2D>( "Warrior" );
+			_archerSelection = Content.Load<Texture2D>( "Archer" );
+			_mageSelection = Content.Load<Texture2D>( "Mage" );
 		}
 
 		protected override void Update( GameTime gameTime )
@@ -304,6 +329,7 @@ namespace DungeonDelvePrototype
 
 		private void ExecuteDragonLogic( GameTime gameTime )
 		{
+			CastFireLine( gameTime );
 
 			/*
 			 Abilities : 
@@ -314,22 +340,59 @@ namespace DungeonDelvePrototype
 			 */
 		}
 
+		private void CastFireLine( GameTime gameTime )
+		{
+			_dragon.AttackTarget = _archer;
+
+			if( _flamePosition.X == 0 && _flamePosition.Y == 0 )
+				_flamePosition = new Vector2( _dragon.CenterPosition.X, _dragon.CenterPosition.Y );
+
+			//TODO : Should fire variable?
+			if( _flameBallsDirection.X == 0 && _flameBallsDirection.Y == 0 )
+				_flameBallsDirection = Vector2.Normalize( _dragon.AttackTarget.CenterPosition - _flamePosition );
+
+			if( _flamePosition.Y < Game_Height && gameTime.TotalGameTime.TotalSeconds - _flameLastDrop > _flameDropDelay ) //GameHeight
+			{
+				_flameLastDrop = gameTime.TotalGameTime.TotalSeconds;
+				_flamePosition += _flameBallsDirection * 16;
+				_flameBalls.Add( new Projectile() { Image = _flameBall, Position = new Vector2( _flamePosition.X, _flamePosition.Y ), SpawnTime = gameTime.TotalGameTime.TotalSeconds, FadeTime = 2, IsVisible = true } ); ;
+			}
+
+			foreach( var flameBall in _flameBalls )
+			{
+				if( flameBall.SpawnTime + flameBall.FadeTime < gameTime.TotalGameTime.TotalSeconds )
+					flameBall.IsVisible = false;
+			}
+		}
+
 		protected override void Draw( GameTime gameTime )
 		{
-			GraphicsDevice.Clear( Color.White );
+			GraphicsDevice.Clear( Color.Black );
 
 			// TODO: Add your drawing code here
 			_spriteBatch.Begin();
+
+			//Bottom Bar.
+			_spriteBatch.Draw( _warriorSelection, new Vector2( 8, 680 ), Color.White );
+			_spriteBatch.Draw( _archerSelection, new Vector2( 48, 680 ), Color.White );
+			_spriteBatch.Draw( _mageSelection, new Vector2( 88, 680 ), Color.White );
+
 			_dragon.Draw( _spriteBatch );
 			_warrior.Draw( _spriteBatch );
 			_archer.Draw( _spriteBatch );
 			_mage.Draw( _spriteBatch );
-			_spriteBatch.Draw( _statusBar, new Vector2( 0, 500 ), Color.White );
-			_spriteBatch.Draw( _actionBarBack, new Vector2( 300, 520 ), Color.White );
 			_spriteBatch.Draw( _bossHealthBack, new Vector2( _bossHealthBackDimensions.Left, _bossHealthBackDimensions.Top ), Color.White );
 			var healthBarValue = ( int )( ( ( _dragon.Life )/( _dragon.MaxLife ) ) * 200 );
 			_spriteBatch.Draw( _bossHealth, new Rectangle( _bossHealthDimensions.Left, _bossHealthDimensions.Top, healthBarValue, 25 ), Color.White );
 			_spriteBatch.DrawString( _basicFont, _currentlySelectedSprite?.Name ?? "", new Vector2( 10, 505 ), Color.Black );
+
+			//Temp Flame Ball
+			foreach( var projectile in _flameBalls )
+			{
+				if( projectile.IsVisible )
+					_spriteBatch.Draw( projectile.Image, new Vector2( projectile.Position.X, projectile.Position.Y ), Color.White );
+			}
+
 
 			if( _currentlySelectedSprite == _warrior )
 				_spriteBatch.Draw( _buttonTaunt, new Vector2( 303, 523 ), Color.White );
